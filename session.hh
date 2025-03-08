@@ -47,13 +47,13 @@ private:
 
   void process_login(const std::string_view msg)
   {
-    _username = msg.substr(0, 6);
+    std::string sequence;
+    std::tie(_username, _password, _session, sequence) =
+      std::tuple(msg.substr(0, 6), msg.substr(6, 10), msg.substr(16, 10), msg.substr(26, 20));
     std::erase(_username, ' ');
-    _password = msg.substr(6, 10);
     std::erase(_password, ' ');
-    _session = msg.substr(16, 10);
     std::erase(_session, ' ');
-    auto sequence = msg.substr(26, 20);
+    std::erase(sequence, ' ');
     auto [ptr, ec] = std::from_chars(sequence.data(), sequence.data() + sequence.length(), _sequence);
     if(ec != std::errc{})
     {
