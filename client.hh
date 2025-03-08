@@ -68,37 +68,42 @@ private:
     static std::regex re_logout{"lo(gout)?"};
     static std::regex re_debug{"debug (.*)"};
     static std::regex re_date{"date"};
-    while(true)
+    try
     {
-      std::string data;
-      co_await asio::async_read_until(_stdin, asio::dynamic_buffer(data), '\n', asio::use_awaitable);
-      if(data.length() >= 1)
+      while(true)
       {
-        data.pop_back();
-        std::smatch m;
-        if(std::regex_match(data, m, re_quit))
-          break;
-        if(std::regex_match(data, m, re_logout))
+        std::string data;
+        co_await asio::async_read_until(_stdin, asio::dynamic_buffer(data), '\n', asio::use_awaitable);
+        if(data.length() >= 1)
         {
-          send_logout();
-          break;
+          data.pop_back();
+          std::smatch m;
+          if(std::regex_match(data, m, re_quit))
+            break;
+          if(std::regex_match(data, m, re_logout))
+          {
+            send_logout();
+            break;
+          }
+          if(std::regex_match(data, m, re_debug))
+          {
+            send_debug(m[1].str());
+            continue;
+          }
+          if(std::regex_match(data, m, re_date))
+          {
+            send_unsequenced(data);
+            continue;
+          }
+          spdlog::info("unknown command");
+          // send_unsequenced(data);
         }
-        if(std::regex_match(data, m, re_debug))
-        {
-          send_debug(m[1].str());
-          continue;
-        }
-        if(std::regex_match(data, m, re_date))
-        {
-          send_unsequenced(data);
-          continue;
-        }
-        spdlog::info("unknown command");
-        // send_unsequenced(data);
       }
+    } catch(const std::exception& ex)
+    {
+      spdlog::info("exception: {}", ex.what());
+      stop();
     }
-
-    stop();
   }
 
   void load_messages()
