@@ -22,7 +22,7 @@ add_subdirectory(external)
 
 # Find libraries
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 
 add_executable(server)
 target_sources(server PRIVATE server.cc)
