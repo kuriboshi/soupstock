@@ -53,14 +53,14 @@ create table if not exists output
     }
   }
 
-  void store_output(const std::string& msg)
+  void store_output(std::string_view msg)
   {
     sqlite3_stmt* stmt{nullptr};
     std::string sql{R"(insert into output (message) values (?))"};
     auto ec = sqlite3_prepare(_db_handle, sql.c_str(), static_cast<int>(sql.length()), &stmt, nullptr);
     if(ec != SQLITE_OK)
       throw std::runtime_error(fmt::format("{}", sqlite3_errmsg(_db_handle)));
-    sqlite3_bind_text(stmt, 1, msg.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 1, msg.data(), msg.size(), SQLITE_STATIC);
     ec = sqlite3_step(stmt);
     if(ec != SQLITE_DONE)
     {
@@ -92,14 +92,14 @@ create table if not exists output
     return rows;
   }
 
-  void store_input(const std::string& msg)
+  void store_input(std::string_view msg)
   {
     std::string sql{fmt::format(R"(insert into input (message) values (?))")};
     sqlite3_stmt* stmt{nullptr};
     auto ec = sqlite3_prepare(_db_handle, sql.c_str(), static_cast<int>(sql.length()), &stmt, nullptr);
     if(ec != SQLITE_OK)
       throw std::runtime_error(fmt::format("{}", sqlite3_errmsg(_db_handle)));
-    sqlite3_bind_text(stmt, 1, msg.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 1, msg.data(), msg.size(), SQLITE_STATIC);
     ec = sqlite3_step(stmt);
     if(ec != SQLITE_DONE)
     {

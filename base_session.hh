@@ -172,7 +172,7 @@ protected:
   int _sequence;
 
 private:
-  virtual void process_message(const std::string& msg) = 0;
+  virtual void process_message(std::string_view msg) = 0;
   virtual void timer_handler() = 0;
 };
 } // namespace fixme

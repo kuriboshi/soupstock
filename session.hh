@@ -38,7 +38,7 @@ public:
   {}
 
 private:
-  void send_sequenced(const std::string& msg)
+  void send_sequenced(std::string_view msg)
   {
     _database.store_output(msg);
     spdlog::info("send sequenced: {}", msg);
@@ -67,8 +67,10 @@ private:
     replay_sequenced();
   }
 
-  void process_message(const std::string& msg) override
+  void process_message(std::string_view msg) override
   {
+    if(msg.empty())
+      throw std::runtime_error("empty message");
     switch(msg[0])
     {
       case '+':

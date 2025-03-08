@@ -127,23 +127,23 @@ private:
     dispatch('O');
   }
 
-  void send_debug(const std::string& data)
+  void send_debug(std::string_view data)
   {
     dispatch('+', data);
   }
 
-  void send_unsequenced(const std::string& data)
+  void send_unsequenced(std::string_view data)
   {
     dispatch('U', data);
   }
 
-  void process_sequenced(const std::string& msg)
+  void process_sequenced(std::string_view msg)
   {
     spdlog::info("{}", msg);
     _database.store_input(msg);
   }
 
-  void process_message(const std::string& msg) override
+  void process_message(std::string_view msg) override
   {
     switch(msg[0])
     {
