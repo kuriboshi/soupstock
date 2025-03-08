@@ -14,14 +14,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_library(soupstock INTERFACE)
+target_sources(soupstock INTERFACE
+  base_session.hh
+  client_session.hh
+  database.hh
+  server_session.hh
+)
+target_link_libraries(soupstock INTERFACE asio::asio)
+target_link_libraries(soupstock INTERFACE sqlite3::sqlite3)
+target_link_libraries(soupstock INTERFACE fmt::fmt)
+target_link_libraries(soupstock INTERFACE spdlog::spdlog)
+target_compile_definitions(soupstock INTERFACE SPDLOG_FMT_EXTERNAL)
+add_library(soupstock::soupstock ALIAS soupstock)
+
 add_executable(server)
 target_sources(server PRIVATE server.cc)
-target_sources(server PRIVATE session.hh base_session.hh database.hh)
-target_link_libraries(server PRIVATE asio sqlite3 fmt::fmt spdlog::spdlog)
-target_compile_definitions(server PRIVATE SPDLOG_FMT_EXTERNAL)
+target_link_libraries(server PRIVATE soupstock::soupstock)
 
 add_executable(client)
 target_sources(client PRIVATE client.cc)
-target_sources(client PRIVATE client.hh base_session.hh database.hh)
-target_link_libraries(client PRIVATE asio sqlite3 fmt::fmt spdlog::spdlog)
-target_compile_definitions(client PRIVATE SPDLOG_FMT_EXTERNAL)
+target_link_libraries(client PRIVATE soupstock::soupstock)

@@ -14,7 +14,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "session.hh"
+#include "server_session.hh"
+
 #include <fmt/format.h>
 #include <fmt/std.h>
 #include <spdlog/spdlog.h>
