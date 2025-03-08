@@ -155,11 +155,21 @@ protected:
   {
     asio::post(_strand, [this, message_type, msg = std::string(data)]() {
       _messages.push_back(fmt::format("{}{}", message_type, msg));
-      if (_messages.size() == 1) {
+      if(_messages.size() == 1)
+      {
         auto self = shared_from_this();
         asio::co_spawn(_strand, [self] { return self->writer(); }, asio::detached);
       }
     });
+  }
+
+  std::string_view trim(std::string_view string)
+  {
+    auto begin = string.find_first_not_of(' ');
+    if(begin == std::string_view::npos)
+      return {};
+    auto end = string.find_last_not_of(' ') + 1;
+    return string.substr(begin, end - begin);
   }
 
   asio::ip::tcp::socket _socket;

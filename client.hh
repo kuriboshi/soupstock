@@ -23,6 +23,7 @@
 #include <deque>
 #include <fmt/format.h>
 #include <fmt/chrono.h>
+#include <fmt/ranges.h>
 #include <regex>
 #include <spdlog/spdlog.h>
 
@@ -99,7 +100,8 @@ private:
           // send_unsequenced(data);
         }
       }
-    } catch(const std::exception& ex)
+    }
+    catch(const std::exception& ex)
     {
       spdlog::info("exception: {}", ex.what());
       stop();
@@ -127,20 +129,11 @@ private:
     asio::co_spawn(_socket.get_executor(), [self] { return self->timeout(); }, asio::detached);
   }
 
-  void send_logout()
-  {
-    dispatch('O');
-  }
+  void send_logout() { dispatch('O'); }
 
-  void send_debug(std::string_view data)
-  {
-    dispatch('+', data);
-  }
+  void send_debug(std::string_view data) { dispatch('+', data); }
 
-  void send_unsequenced(std::string_view data)
-  {
-    dispatch('U', data);
-  }
+  void send_unsequenced(std::string_view data) { dispatch('U', data); }
 
   void process_sequenced(std::string_view msg)
   {
@@ -157,10 +150,14 @@ private:
         break;
       case 'J':
         spdlog::info("login rejected {}", msg.substr(2, 1));
+        stop();
         break;
       case 'A':
-        spdlog::info("login accept '{}' '{}' '{}' '{}'", msg.substr(1, 6), msg.substr(7, 10), msg.substr(17, 10),
-          msg.substr(27, 20));
+        spdlog::info("login accept {}",
+          std::tuple(
+            trim(msg.substr(1, 6)), trim(msg.substr(7, 10)), trim(msg.substr(17, 10)), trim(msg.substr(27, 20))));
+        break;
+      case 'U':
         break;
       case 'S':
         process_sequenced(msg.substr(1));
@@ -174,10 +171,7 @@ private:
     }
   }
 
-  void timer_handler() override
-  {
-    dispatch('R');
-  }
+  void timer_handler() override { dispatch('R'); }
 
   std::string _host;
   std::string _port;

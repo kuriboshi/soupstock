@@ -24,6 +24,7 @@
 #include <fmt/chrono.h>
 #include <fmt/format.h>
 #include <fmt/std.h>
+#include <fmt/ranges.h>
 #include <spdlog/spdlog.h>
 
 using namespace std::literals;
@@ -49,11 +50,7 @@ private:
   {
     std::string sequence;
     std::tie(_username, _password, _session, sequence) =
-      std::tuple(msg.substr(0, 6), msg.substr(6, 10), msg.substr(16, 10), msg.substr(26, 20));
-    std::erase(_username, ' ');
-    std::erase(_password, ' ');
-    std::erase(_session, ' ');
-    std::erase(sequence, ' ');
+      std::tuple(trim(msg.substr(0, 6)), trim(msg.substr(6, 10)), trim(msg.substr(16, 10)), trim(msg.substr(26, 20)));
     auto [ptr, ec] = std::from_chars(sequence.data(), sequence.data() + sequence.length(), _sequence);
     if(ec != std::errc{})
     {
@@ -61,7 +58,7 @@ private:
       dispatch('J', "A");
       return;
     }
-    spdlog::info("process_login '{}' '{}' '{}' '{}'", _username, _password, _session, _sequence);
+    spdlog::info("process_login {}", std::tuple(_username, _password, _session, _sequence));
     dispatch('A', msg);
     _database.open(fmt::format("server-{}-{}.db", _username, _session));
     replay_sequenced();
@@ -100,14 +97,11 @@ private:
   void process_unsequenced(const std::string_view msg)
   {
     if(msg == "date")
-      send_sequenced(fmt::format(
-        "{:%Y-%m-%d %H:%M:%S}", std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now())));
+      send_sequenced(fmt::format("{:%Y-%m-%d %H:%M:%S}",
+        std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now())));
   }
 
-  void timer_handler() override
-  {
-    dispatch('H');
-  }
+  void timer_handler() override { dispatch('H'); }
 
   void replay_sequenced()
   {
