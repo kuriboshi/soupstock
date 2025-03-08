@@ -14,10 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 3.30.0)
+add_executable(server)
+target_sources(server PRIVATE server.cc)
+target_sources(server PRIVATE session.hh base_session.hh database.hh)
+target_link_libraries(server PRIVATE asio sqlite3 fmt::fmt spdlog::spdlog)
+target_compile_definitions(server PRIVATE SPDLOG_FMT_EXTERNAL)
 
-project(fixme VERSION 1.0.0)
-set(CMAKE_CXX_STANDARD 23)
-
-add_subdirectory(external)
-add_subdirectory(src)
+add_executable(client)
+target_sources(client PRIVATE client.cc)
+target_sources(client PRIVATE client.hh base_session.hh database.hh)
+target_link_libraries(client PRIVATE asio sqlite3 fmt::fmt spdlog::spdlog)
+target_compile_definitions(client PRIVATE SPDLOG_FMT_EXTERNAL)
