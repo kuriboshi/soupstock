@@ -117,7 +117,6 @@ private:
     dispatch('L', msg);
     asio::connect(_socket, _resolver.resolve(_host, _port));
     auto self = std::static_pointer_cast<client>(shared_from_this());
-    asio::co_spawn(_socket.get_executor(), [self] { return self->writer(); }, asio::detached);
     asio::co_spawn(_socket.get_executor(), [self] { return self->reader(); }, asio::detached);
     asio::co_spawn(_socket.get_executor(), [self] { return self->timer(); }, asio::detached);
     asio::co_spawn(_socket.get_executor(), [self] { return self->timeout(); }, asio::detached);
@@ -146,7 +145,6 @@ private:
 
   void process_message(const std::string& msg) override
   {
-    spdlog::info("message: {}", msg);
     switch(msg[0])
     {
       case '+':

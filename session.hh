@@ -41,6 +41,7 @@ private:
   void send_sequenced(const std::string& msg)
   {
     _database.store_output(msg);
+    spdlog::info("send sequenced: {}", msg);
     dispatch('S', msg);
   }
 
@@ -68,7 +69,6 @@ private:
 
   void process_message(const std::string& msg) override
   {
-    spdlog::info("message: {}", msg);
     switch(msg[0])
     {
       case '+':
@@ -99,7 +99,7 @@ private:
   {
     if(msg == "date")
       send_sequenced(fmt::format(
-        "{:%Y-%m-%d %H:%M:%S}", std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now())));
+        "{:%Y-%m-%d %H:%M:%S}", std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now())));
   }
 
   void timer_handler() override

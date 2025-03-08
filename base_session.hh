@@ -47,7 +47,6 @@ public:
   {
     auto self = shared_from_this();
     asio::co_spawn(_strand, [self] { return self->reader(); }, asio::detached);
-    asio::co_spawn(_strand, [self] { return self->writer(); }, asio::detached);
     asio::co_spawn(_strand, [self] { return self->timer(); }, asio::detached);
     asio::co_spawn(_strand, [self] { return self->timeout(); }, asio::detached);
   }
@@ -92,7 +91,7 @@ protected:
     }
     catch(const std::exception& ex)
     {
-      spdlog::info("writer: {}", ex.what());
+      spdlog::info("exception: {}", ex.what());
       stop();
     }
   }
@@ -115,7 +114,7 @@ protected:
     }
     catch(const std::exception& ex)
     {
-      spdlog::info("{}", ex.what());
+      spdlog::info("exception: {}", ex.what());
       stop();
     }
   }
@@ -131,14 +130,14 @@ protected:
         co_await _timeout.async_wait(asio::redirect_error(asio::use_awaitable, ec));
         if(ec != asio::error::operation_aborted)
         {
-          spdlog::info("Timeout");
+          throw std::runtime_error("timeout");
           stop();
         }
       }
     }
     catch(const std::exception& ex)
     {
-      spdlog::info("{}", ex.what());
+      spdlog::info("exception: {}", ex.what());
       stop();
     }
   }
