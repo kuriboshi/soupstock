@@ -38,7 +38,7 @@ struct session_config
   std::string session;
 };
 
-class client: public std::enable_shared_from_this<client>, public base_session
+class client: public base_session
 {
 public:
   client(asio::io_context& context, const session_config& config)
@@ -112,29 +112,27 @@ private:
 
   void send_login()
   {
-    auto msg = fmt::format("L{:<6s}{:<10s}{:<10s}{:<20d}", _username, _password, _session, _sequence);
-    dispatch(msg);
+    auto msg = fmt::format("{:<6s}{:<10s}{:<10s}{:<20d}", _username, _password, _session, _sequence);
+    dispatch('L', msg);
     asio::connect(_socket, _resolver.resolve(_host, _port));
-    asio::co_spawn(_socket.get_executor(), [self = shared_from_this()] { return self->writer(); }, asio::detached);
-    asio::co_spawn(_socket.get_executor(), [self = shared_from_this()] { return self->reader(); }, asio::detached);
+    auto self = std::static_pointer_cast<client>(shared_from_this());
+    asio::co_spawn(_socket.get_executor(), [self] { return self->writer(); }, asio::detached);
+    asio::co_spawn(_socket.get_executor(), [self] { return self->reader(); }, asio::detached);
   }
 
   void send_logout()
   {
-    auto msg = fmt::format("O");
-    dispatch(msg);
+    dispatch('O');
   }
 
   void send_debug(const std::string& data)
   {
-    auto msg = fmt::format("+{}", data);
-    dispatch(msg);
+    dispatch('+', data);
   }
 
   void send_unsequenced(const std::string& data)
   {
-    auto msg = fmt::format("U{}", data);
-    dispatch(msg);
+    dispatch('U', data);
   }
 
   void process_sequenced(const std::string& msg)
@@ -168,10 +166,9 @@ private:
     }
   }
 
-  void timer_handler(asio::error_code ec) override
+  void timer_handler() override
   {
-    if(ec != asio::error::operation_aborted)
-      _messages.push_back("R");
+    _messages.push_back("R");
   }
 
   std::string _host;

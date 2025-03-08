@@ -29,7 +29,7 @@ using namespace std::literals;
 
 namespace fixme::soup
 {
-class session: public std::enable_shared_from_this<session>, public base_session
+class session: public base_session
 {
 public:
   session(asio::ip::tcp::socket socket)
@@ -38,15 +38,17 @@ public:
 
   void run()
   {
-    asio::co_spawn(_socket.get_executor(), [self = shared_from_this()] { return self->reader(); }, asio::detached);
-    asio::co_spawn(_socket.get_executor(), [self = shared_from_this()] { return self->writer(); }, asio::detached);
+    auto self = std::static_pointer_cast<session>(shared_from_this());
+    asio::co_spawn(_strand, [self] { return self->reader(); }, asio::detached);
+    asio::co_spawn(_strand, [self] { return self->writer(); }, asio::detached);
+    asio::co_spawn(_strand, [self] { return self->timer(); }, asio::detached);
   }
 
 private:
   void send_sequenced(const std::string& msg)
   {
     _database.store_output(msg);
-    dispatch(fmt::format("S{}", msg));
+    dispatch('S', msg);
   }
 
   void process_login(const std::string_view msg)
@@ -62,11 +64,11 @@ private:
     if(ec != std::errc{})
     {
       fmt::println("process_login: {}", std::make_error_code(ec).message());
-      dispatch("JA");
+      dispatch('J', "A");
       return;
     }
     fmt::println("process_login '{}' '{}' '{}' '{}'", _username, _password, _session, _sequence);
-    dispatch(fmt::format("A{}", msg));
+    dispatch('A', msg);
     _database.open(fmt::format("server-{}-{}.db", _username, _session));
     replay_sequenced();
   }
@@ -105,10 +107,9 @@ private:
         "{:%Y-%m-%d %H:%M:%S}", std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now())));
   }
 
-  void timer_handler(asio::error_code ec) override
+  void timer_handler() override
   {
-    if(ec != asio::error::operation_aborted)
-      dispatch("H");
+    dispatch('H');
   }
 
   void replay_sequenced()
@@ -124,7 +125,7 @@ private:
     {
       _sequence = r.sequence;
       fmt::println("{}", r.message);
-      dispatch(fmt::format("S{}", r.message));
+      dispatch('S', r.message);
     }
   }
 

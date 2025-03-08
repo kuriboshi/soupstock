@@ -24,16 +24,18 @@ using namespace std::literals;
 
 namespace fixme
 {
-class base_session
+class base_session: public std::enable_shared_from_this<base_session>
 {
 public:
   base_session(asio::ip::tcp::socket socket)
     : _socket(std::move(socket)),
-      _timer(_socket.get_executor())
+      _strand(asio::make_strand(_socket.get_executor())),
+      _timer(_strand)
   {}
   base_session(asio::ip::tcp::socket socket, std::string session)
     : _socket(std::move(socket)),
-      _timer(_socket.get_executor()),
+      _strand(asio::make_strand(_socket.get_executor())),
+      _timer(_strand),
       _session(std::move(session))
   {}
   virtual ~base_session() = default;
@@ -43,7 +45,7 @@ protected:
   {
     try
     {
-      for(;;)
+      while(_socket.is_open())
       {
         std::int16_t length;
         co_await asio::async_read(_socket, asio::buffer(&length, sizeof(length)), asio::use_awaitable);
@@ -64,30 +66,40 @@ protected:
   {
     try
     {
-      while(_socket.is_open())
+      while(_socket.is_open() && !_messages.empty())
       {
-        if(_messages.empty())
-        {
-          _timer.expires_after(1s);
-          asio::error_code ec;
-          co_await _timer.async_wait(asio::redirect_error(asio::use_awaitable, ec));
-          timer_handler(ec);
-        }
-        else
-        {
-          auto data = _messages.front();
-          std::int16_t length = data.length();
-          length = htons(length);
-          co_await asio::async_write(_socket, asio::buffer(&length, sizeof(length)), asio::use_awaitable);
-          co_await asio::async_write(_socket, asio::buffer(data), asio::use_awaitable);
-          _messages.pop_front();
-          _timer.expires_after(1s);
-        }
+        auto data = _messages.front();
+        std::int16_t length = data.length();
+        length = htons(length);
+        co_await asio::async_write(_socket, asio::buffer(&length, sizeof(length)), asio::use_awaitable);
+        co_await asio::async_write(_socket, asio::buffer(data), asio::use_awaitable);
+        _messages.pop_front();
+        _timer.expires_after(1s);
       }
     }
     catch(const std::exception& ex)
     {
       fmt::println("writer: {}", ex.what());
+      stop();
+    }
+  }
+
+  asio::awaitable<void> timer()
+  {
+    try
+    {
+      while(_socket.is_open())
+      {
+        _timer.expires_after(1s);
+        asio::error_code ec;
+        co_await _timer.async_wait(asio::redirect_error(asio::use_awaitable, ec));
+        if(ec != asio::error::operation_aborted)
+          timer_handler();
+      }
+    }
+    catch(const std::exception& ex)
+    {
+      fmt::println("{}", ex.what());
       stop();
     }
   }
@@ -100,13 +112,19 @@ protected:
     _timer.cancel();
   }
 
-  void dispatch(const std::string& data)
+  void dispatch(char message_type, std::string_view data = {})
   {
-    _messages.push_back(data);
-    _timer.cancel_one();
+    asio::post(_strand, [this, message_type, msg = std::string(data)]() {
+      _messages.push_back(fmt::format("{}{}", message_type, msg));
+      if (_messages.size() == 1) {
+        auto self = shared_from_this();
+        asio::co_spawn(_strand, [self] { return self->writer(); }, asio::detached);
+      }
+    });
   }
 
   asio::ip::tcp::socket _socket;
+  asio::strand<asio::any_io_executor> _strand;
   asio::steady_timer _timer;
   std::string _session;
 
@@ -115,6 +133,6 @@ protected:
 
 private:
   virtual void process_message(const std::string& msg) = 0;
-  virtual void timer_handler(asio::error_code ec) = 0;
+  virtual void timer_handler() = 0;
 };
 } // namespace fixme
