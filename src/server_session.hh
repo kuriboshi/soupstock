@@ -18,12 +18,11 @@
 
 #include "base_session.hh"
 #include "database.hh"
+
 #include <asio.hpp>
 #include <charconv>
 #include <chrono>
 #include <fmt/chrono.h>
-#include <fmt/format.h>
-#include <fmt/std.h>
 #include <fmt/ranges.h>
 #include <spdlog/spdlog.h>
 

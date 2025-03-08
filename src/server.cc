@@ -16,7 +16,6 @@
 
 #include "server_session.hh"
 
-#include <fmt/format.h>
 #include <fmt/std.h>
 #include <spdlog/spdlog.h>
 #include <system_error>
