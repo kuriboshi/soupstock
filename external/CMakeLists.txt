@@ -23,8 +23,9 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_BINARY_DIR}/cmake)
 include(CPM)
 
 CPMAddPackage("gh:google/googletest@1.14.0")
+CPMAddPackage("gh:gabime/spdlog@1.15.1")
 CPMAddPackage("gh:chriskohlhoff/asio#asio-1-30-2@1.30.2")
-CPMAddPackage("gh:fmtlib/fmt#11.0.2")
+CPMAddPackage("gh:fmtlib/fmt#11.1.3")
 CPMAddPackage(NAME sqlite3 URL "https://sqlite.org/2024/sqlite-amalgamation-3460000.zip")
 
 find_package(Threads REQUIRED)

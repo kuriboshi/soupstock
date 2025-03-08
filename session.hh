@@ -24,6 +24,7 @@
 #include <fmt/chrono.h>
 #include <fmt/format.h>
 #include <fmt/std.h>
+#include <spdlog/spdlog.h>
 
 using namespace std::literals;
 
@@ -55,11 +56,11 @@ private:
     auto [ptr, ec] = std::from_chars(sequence.data(), sequence.data() + sequence.length(), _sequence);
     if(ec != std::errc{})
     {
-      fmt::println("process_login: {}", std::make_error_code(ec).message());
+      spdlog::info("process_login: {}", std::make_error_code(ec).message());
       dispatch('J', "A");
       return;
     }
-    fmt::println("process_login '{}' '{}' '{}' '{}'", _username, _password, _session, _sequence);
+    spdlog::info("process_login '{}' '{}' '{}' '{}'", _username, _password, _session, _sequence);
     dispatch('A', msg);
     _database.open(fmt::format("server-{}-{}.db", _username, _session));
     replay_sequenced();
@@ -67,11 +68,11 @@ private:
 
   void process_message(const std::string& msg) override
   {
-    fmt::println("{}", msg);
+    spdlog::info("message: {}", msg);
     switch(msg[0])
     {
       case '+':
-        fmt::println("debug {}", msg.substr(1));
+        spdlog::info("debug {}", msg.substr(1));
         break;
       case 'L':
         process_login(msg.substr(1));
@@ -82,15 +83,14 @@ private:
         process_unsequenced(msg.substr(1));
         break;
       case 'R':
-        fmt::println("R");
         _timeout.expires_after(15s);
         break;
       case 'O':
-        fmt::println("logout");
+        spdlog::info("logout");
         stop();
         break;
       default:
-        fmt::println("unknown packet type: {}", msg[0]);
+        spdlog::info("unknown packet type: {}", msg[0]);
         break;
     }
   }
@@ -119,7 +119,7 @@ private:
     for(const auto& r: rows)
     {
       _sequence = r.sequence;
-      fmt::println("{}", r.message);
+      spdlog::info("{}", r.message);
       dispatch('S', r.message);
     }
   }

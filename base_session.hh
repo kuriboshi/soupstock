@@ -19,6 +19,7 @@
 #include <asio.hpp>
 #include <deque>
 #include <fmt/format.h>
+#include <spdlog/spdlog.h>
 
 using namespace std::literals;
 
@@ -63,12 +64,13 @@ protected:
         length = ntohs(length);
         std::string msg;
         co_await asio::async_read(_socket, asio::dynamic_buffer(msg, length), asio::use_awaitable);
+        _timeout.expires_after(15s);
         process_message(msg);
       }
     }
     catch(const std::exception& ex)
     {
-      fmt::println("session '{}' closed: {}", _session, ex.what());
+      spdlog::info("session '{}' closed: {}", _session, ex.what());
       stop();
     }
   }
@@ -85,13 +87,12 @@ protected:
         co_await asio::async_write(_socket, asio::buffer(&length, sizeof(length)), asio::use_awaitable);
         co_await asio::async_write(_socket, asio::buffer(data), asio::use_awaitable);
         _messages.pop_front();
-        _timer.expires_after(1s);
-        _timeout.expires_after(15s);
       }
+      _timer.expires_after(1s);
     }
     catch(const std::exception& ex)
     {
-      fmt::println("writer: {}", ex.what());
+      spdlog::info("writer: {}", ex.what());
       stop();
     }
   }
@@ -106,12 +107,15 @@ protected:
         asio::error_code ec;
         co_await _timer.async_wait(asio::redirect_error(asio::use_awaitable, ec));
         if(ec != asio::error::operation_aborted)
+        {
+          _timer.expires_after(1s);
           timer_handler();
+        }
       }
     }
     catch(const std::exception& ex)
     {
-      fmt::println("{}", ex.what());
+      spdlog::info("{}", ex.what());
       stop();
     }
   }
@@ -127,14 +131,14 @@ protected:
         co_await _timeout.async_wait(asio::redirect_error(asio::use_awaitable, ec));
         if(ec != asio::error::operation_aborted)
         {
-          fmt::println("Timeout");
+          spdlog::info("Timeout");
           stop();
         }
       }
     }
     catch(const std::exception& ex)
     {
-      fmt::println("{}", ex.what());
+      spdlog::info("{}", ex.what());
       stop();
     }
   }

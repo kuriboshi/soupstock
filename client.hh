@@ -24,6 +24,7 @@
 #include <fmt/format.h>
 #include <fmt/chrono.h>
 #include <regex>
+#include <spdlog/spdlog.h>
 
 using namespace std::literals;
 
@@ -92,7 +93,7 @@ private:
           send_unsequenced(data);
           continue;
         }
-        fmt::println("unknown command");
+        spdlog::info("unknown command");
         // send_unsequenced(data);
       }
     }
@@ -106,7 +107,7 @@ private:
     for(const auto& r: rows)
     {
       _sequence = r.sequence;
-      fmt::println("{}", r.message);
+      spdlog::info("{}", r.message);
     }
   }
 
@@ -139,33 +140,33 @@ private:
 
   void process_sequenced(const std::string& msg)
   {
-    fmt::println("{}", msg);
+    spdlog::info("{}", msg);
     _database.store_input(msg);
   }
 
   void process_message(const std::string& msg) override
   {
+    spdlog::info("message: {}", msg);
     switch(msg[0])
     {
       case '+':
-        fmt::println("debug {}", msg.substr(1));
+        spdlog::info("debug {}", msg.substr(1));
         break;
       case 'J':
-        fmt::println("login rejected {}", msg.substr(2, 1));
+        spdlog::info("login rejected {}", msg.substr(2, 1));
         break;
       case 'A':
-        fmt::println("login accept '{}' '{}' '{}' '{}'", msg.substr(1, 6), msg.substr(7, 10), msg.substr(17, 10),
+        spdlog::info("login accept '{}' '{}' '{}' '{}'", msg.substr(1, 6), msg.substr(7, 10), msg.substr(17, 10),
           msg.substr(27, 20));
         break;
       case 'S':
         process_sequenced(msg.substr(1));
         break;
       case 'H':
-        fmt::println("H");
         _timeout.expires_after(15s);
         break;
       default:
-        fmt::println("unknown packet type: {}", msg[0]);
+        spdlog::info("unknown packet type: {}", msg[0]);
         break;
     }
   }

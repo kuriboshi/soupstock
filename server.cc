@@ -17,6 +17,7 @@
 #include "session.hh"
 #include <fmt/format.h>
 #include <fmt/std.h>
+#include <spdlog/spdlog.h>
 #include <system_error>
 
 namespace fixme
@@ -37,14 +38,14 @@ private:
       if(!ec)
         create_session(std::move(socket));
       else
-        fmt::println("error: {}", ec);
+        spdlog::info("error: {}", ec);
       accept();
     });
   }
 
   void create_session(asio::ip::tcp::socket socket)
   {
-    fmt::println(
+    spdlog::info(
       "creating session on: {}:{}", socket.remote_endpoint().address().to_string(), socket.remote_endpoint().port());
     std::make_shared<soup::session>(std::move(socket))->run();
   }
