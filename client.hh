@@ -118,6 +118,8 @@ private:
     auto self = std::static_pointer_cast<client>(shared_from_this());
     asio::co_spawn(_socket.get_executor(), [self] { return self->writer(); }, asio::detached);
     asio::co_spawn(_socket.get_executor(), [self] { return self->reader(); }, asio::detached);
+    asio::co_spawn(_socket.get_executor(), [self] { return self->timer(); }, asio::detached);
+    asio::co_spawn(_socket.get_executor(), [self] { return self->timeout(); }, asio::detached);
   }
 
   void send_logout()
@@ -159,6 +161,8 @@ private:
         process_sequenced(msg.substr(1));
         break;
       case 'H':
+        fmt::println("H");
+        _timeout.expires_after(15s);
         break;
       default:
         fmt::println("unknown packet type: {}", msg[0]);
@@ -168,7 +172,7 @@ private:
 
   void timer_handler() override
   {
-    _messages.push_back("R");
+    dispatch('R');
   }
 
   std::string _host;

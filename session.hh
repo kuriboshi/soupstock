@@ -36,14 +36,6 @@ public:
     : base_session(std::move(socket))
   {}
 
-  void run()
-  {
-    auto self = std::static_pointer_cast<session>(shared_from_this());
-    asio::co_spawn(_strand, [self] { return self->reader(); }, asio::detached);
-    asio::co_spawn(_strand, [self] { return self->writer(); }, asio::detached);
-    asio::co_spawn(_strand, [self] { return self->timer(); }, asio::detached);
-  }
-
 private:
   void send_sequenced(const std::string& msg)
   {
@@ -75,6 +67,7 @@ private:
 
   void process_message(const std::string& msg) override
   {
+    fmt::println("{}", msg);
     switch(msg[0])
     {
       case '+':
@@ -89,6 +82,8 @@ private:
         process_unsequenced(msg.substr(1));
         break;
       case 'R':
+        fmt::println("R");
+        _timeout.expires_after(15s);
         break;
       case 'O':
         fmt::println("logout");
