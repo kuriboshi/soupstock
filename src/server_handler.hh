@@ -41,25 +41,25 @@ public:
   template<typename Session>
   void process_login(Session& session, const std::string_view msg)
   {
-    auto [username, password, sessionName, sequenceNumber] =
+    auto [username, password, session_name, sequence_number] =
       std::tuple(trim(msg.substr(0, 6)), trim(msg.substr(6, 10)), trim(msg.substr(16, 10)), trim(msg.substr(26, 20)));
     int sequence;
-    auto [ptr, ec] = std::from_chars(sequenceNumber.data(), sequenceNumber.data() + sequenceNumber.length(), sequence);
+    auto [ptr, ec] =
+      std::from_chars(sequence_number.data(), sequence_number.data() + sequence_number.length(), sequence);
     if(ec != std::errc{})
     {
-      spdlog::info("reject login {}: {}", std::tuple(username, password, sessionName, sequenceNumber),
+      spdlog::info("reject login {}: {}", std::tuple(username, password, session_name, sequence_number),
         std::make_error_code(ec).message());
       return session.reject_login("A");
     }
-    if(!_authenticator->authenticate(username, password, sessionName))
+    if(!_authenticator->authenticate(username, password, session_name))
     {
-      spdlog::info("reject login {}: {}", std::tuple(username, password, sessionName, sequenceNumber),
-        std::make_error_code(ec).message());
+      spdlog::info("reject login {}", std::tuple(username, password, session_name, sequence_number));
       return session.reject_login("A");
     }
-    _session = sessionName;
-    spdlog::info("{}: accept login {}", _session, std::tuple(username, password, sessionName, sequenceNumber));
-    session.accept_login(_session, fmt::format("{:>10}{:>20}", sessionName, sequence));
+    _session_name = session_name;
+    spdlog::info("{}: accept login {}", _session_name, std::tuple(username, password, session_name, sequence_number));
+    session.accept_login(_session_name, fmt::format("{:>10}{:>20}", session_name, sequence));
     session.replay_sequenced(sequence);
     return;
   }
@@ -73,6 +73,6 @@ public:
   }
 
 private:
-  std::string _session;
+  std::string _session_name;
 };
 } // namespace fixme::soupstock

@@ -36,24 +36,17 @@ namespace fixme
 class base_session: public std::enable_shared_from_this<base_session>
 {
 public:
-  base_session(asio::ip::tcp::socket socket)
-    : _socket(std::move(socket)),
-      _strand(asio::make_strand(_socket.get_executor())),
-      _timer(_strand),
-      _timeout(_strand)
-  {}
-
-  base_session(asio::ip::tcp::socket socket, std::string session)
+  base_session(asio::ip::tcp::socket socket, std::string session_name = "")
     : _socket(std::move(socket)),
       _strand(asio::make_strand(_socket.get_executor())),
       _timer(_strand),
       _timeout(_strand),
-      _session(std::move(session))
+      _session_name(std::move(session_name))
   {}
 
   virtual ~base_session() = default;
 
-  const std::string& name() const { return _session; }
+  const std::string& name() const { return _session_name; }
   int sequence() const { return _sequence; }
 
   void run()
@@ -84,7 +77,7 @@ protected:
     }
     catch(const std::exception& ex)
     {
-      spdlog::info("{}: session closed: {}", _session, ex.what());
+      spdlog::info("{}: session closed: {}", _session_name, ex.what());
       stop();
     }
   }
@@ -110,7 +103,7 @@ protected:
     }
     catch(const std::exception& ex)
     {
-      spdlog::info("{}: exception: {}", _session, ex.what());
+      spdlog::info("{}: exception: {}", _session_name, ex.what());
       stop();
     }
   }
@@ -138,7 +131,7 @@ protected:
     }
     catch(const std::exception& ex)
     {
-      spdlog::info("{}: exception: {}", _session, ex.what());
+      spdlog::info("{}: exception: {}", _session_name, ex.what());
       stop();
     }
   }
@@ -163,7 +156,7 @@ protected:
     }
     catch(const std::exception& ex)
     {
-      spdlog::info("{}: exception: {}", _session, ex.what());
+      spdlog::info("{}: exception: {}", _session_name, ex.what());
       stop();
     }
   }
@@ -198,7 +191,7 @@ protected:
   asio::strand<asio::any_io_executor> _strand;
   asio::steady_timer _timer;
   asio::steady_timer _timeout;
-  std::string _session;
+  std::string _session_name;
 
   std::deque<std::string> _messages;
   int _sequence;

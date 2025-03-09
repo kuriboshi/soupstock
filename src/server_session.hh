@@ -33,26 +33,34 @@ template<template<typename> class Handler, typename Authenticator>
 class server_session: public base_session
 {
 public:
-  server_session(asio::ip::tcp::socket socket, std::shared_ptr<Authenticator> authenticator)
+  server_session(asio::ip::tcp::socket socket, std::shared_ptr<Authenticator> authenticator,
+    std::function<void(std::string_view session_name)> remove_session)
     : base_session(std::move(socket)),
-      _handler(std::make_unique<Handler<Authenticator>>(std::move(authenticator)))
+      _handler(std::make_unique<Handler<Authenticator>>(std::move(authenticator))),
+      _remove_session(std::move(remove_session))
   {}
+
+  ~server_session()
+  {
+    if(!_session_name.empty() && _remove_session)
+      _remove_session(_session_name);
+  }
 
   void send_sequenced(std::string_view msg)
   {
     ++_sequence;
-    spdlog::info("{}: sequenced ({}) {}", _session, _sequence, msg);
+    spdlog::info("{}: sequenced ({}) {}", _session_name, _sequence, msg);
     _database.store_output(msg);
     dispatch('S', msg);
   }
 
   void reject_login(std::string_view reason) { dispatch('J', reason); }
 
-  void accept_login(std::string_view session, std::string_view msg)
+  void accept_login(std::string_view session_name, std::string_view msg)
   {
-    _session = session;
+    _session_name = session_name;
     dispatch('A', msg);
-    _database.open(fmt::format("server-{}.db", session));
+    _database.open(fmt::format("server-{}.db", _session_name));
   }
 
   void replay_sequenced(int sequence)
@@ -69,7 +77,7 @@ private:
     switch(msg[0])
     {
       case '+':
-        spdlog::info("{}: debug {}", _session, msg.substr(1));
+        spdlog::info("{}: debug {}", _session_name, msg.substr(1));
         break;
       case 'L':
         _handler->process_login(*this, msg.substr(1));
@@ -83,7 +91,7 @@ private:
         _timeout.expires_after(15s);
         break;
       case 'O':
-        spdlog::info("{}: logout", _session);
+        spdlog::info("{}: logout", _session_name);
         stop();
         break;
       default:
@@ -102,12 +110,13 @@ private:
     for(const auto& r: rows)
     {
       _sequence = r.sequence;
-      spdlog::info("{}: replay ({}) '{}'", _session, _sequence, r.message);
+      spdlog::info("{}: replay ({}) '{}'", _session_name, _sequence, r.message);
       dispatch('S', r.message);
     }
   }
 
   std::unique_ptr<Handler<Authenticator>> _handler;
+  std::function<void(std::string_view session_name)> _remove_session;
   database _database;
 };
 } // namespace fixme::soupstock

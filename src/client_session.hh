@@ -67,10 +67,10 @@ public:
 
   void send_login()
   {
-    _database.open(fmt::format("client-{}-{}.db", _username, _session));
+    _database.open(fmt::format("client-{}-{}.db", _username, _session_name));
     load_messages();
     ++_sequence;
-    auto msg = fmt::format("{:<6s}{:<10s}{:<10s}{:<20d}", _username, _password, _session, _sequence);
+    auto msg = fmt::format("{:<6s}{:<10s}{:<10s}{:<20d}", _username, _password, _session_name, _sequence);
     dispatch('L', msg);
     asio::connect(_socket, _resolver.resolve(_host, _port));
   }

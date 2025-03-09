@@ -42,13 +42,14 @@ public:
     bool operator()(std::string_view lhs, std::string_view rhs) const { return lhs == rhs; }
   };
 
-  bool authenticate(std::string_view username, std::string_view password, std::string_view sessionName)
+  bool authenticate(std::string_view username, std::string_view password, std::string_view session_name)
   {
     if(auto session{_user_sessions.find(username)};
-      session != _user_sessions.end() && session->second.contains(sessionName))
+      session != _user_sessions.end() && session->second.contains(session_name))
     {
       auto user{_users.find(username)};
-      return user != _users.end() && user->second == password;
+      return user != _users.end() && user->second == password
+        && _active_sessions.emplace(std::string(session_name)).second;
     }
     return false;
   }
@@ -60,11 +61,14 @@ public:
     place->second.emplace(session);
   }
 
+  void remove_session(std::string_view session_name) { _active_sessions.erase(std::string(session_name)); }
+
 private:
   std::unordered_map<std::string, std::string, string_view_hash, string_view_equal> _users;
   std::unordered_map<std::string, std::unordered_set<std::string, string_view_hash, string_view_equal>,
     string_view_hash, string_view_equal>
     _user_sessions;
+  std::unordered_set<std::string, string_view_hash, string_view_equal> _active_sessions;
 };
 
 /// @brief Accepts TCP connections, creating server sessions for each connection.
@@ -81,6 +85,8 @@ public:
   {
     accept();
   }
+
+  void remove_session(std::string_view session_name) { _authenticator->remove_session(session_name); }
 
 private:
   /// @brief Creates a server session when a new connection is accepted.
@@ -102,7 +108,8 @@ private:
   {
     spdlog::info(
       "creating session on: {}:{}", socket.remote_endpoint().address().to_string(), socket.remote_endpoint().port());
-    std::make_shared<soupstock::server_session<server_handler, authenticator>>(std::move(socket), _authenticator)
+    std::make_shared<soupstock::server_session<server_handler, authenticator>>(
+      std::move(socket), _authenticator, [this](std::string_view session_name) { remove_session(session_name); })
       ->run();
   }
 
