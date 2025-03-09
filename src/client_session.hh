@@ -88,14 +88,15 @@ private:
     for(const auto& r: rows)
     {
       _sequence = r.sequence;
-      spdlog::info("{}", r.message);
+      spdlog::info("load: ({}) {}", _sequence, r.message);
     }
   }
 
   void process_sequenced(std::string_view msg)
   {
     _database.store_input(msg);
-    _handler->process_sequenced(msg);
+    _handler->process_sequenced(*this, msg);
+    ++_sequence;
   }
 
   void process_message(std::string_view msg) override
@@ -106,13 +107,11 @@ private:
         spdlog::info("debug {}", msg.substr(1));
         break;
       case 'J':
-        spdlog::info("login rejected {}", msg.substr(2, 1));
+        spdlog::info("login rejected {}", msg.substr(1, 1));
         stop();
         break;
       case 'A':
-        spdlog::info("login accept {}",
-          std::tuple(
-            trim(msg.substr(1, 6)), trim(msg.substr(7, 10)), trim(msg.substr(17, 10)), trim(msg.substr(27, 20))));
+        spdlog::info("login accept {}", std::tuple(trim(msg.substr(1, 10)), trim(msg.substr(11, 20))));
         break;
       case 'U':
         break;

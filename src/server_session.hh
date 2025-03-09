@@ -32,8 +32,6 @@ namespace fixme::soupstock
 template<typename Handler>
 class server_session: public base_session
 {
-  std::unique_ptr<Handler> _handler;
-
 public:
   server_session(asio::ip::tcp::socket socket)
     : base_session(std::move(socket)),
@@ -42,17 +40,24 @@ public:
 
   void send_sequenced(std::string_view msg)
   {
+    ++_sequence;
+    spdlog::info("{}: sequenced ({}) {}", _session, _sequence, msg);
     _database.store_output(msg);
-    spdlog::info("send sequenced: {}", msg);
     dispatch('S', msg);
   }
 
-  void send_reject_login(std::string_view reason) { dispatch('J', reason); }
+  void reject_login(std::string_view reason) { dispatch('J', reason); }
 
-  void send_accept_login(std::string_view session, std::string_view msg)
+  void accept_login(std::string_view session, std::string_view msg)
   {
+    _session = session;
     dispatch('A', msg);
     _database.open(fmt::format("server-{}.db", session));
+  }
+
+  void replay_sequenced(int sequence)
+  {
+    _sequence = sequence;
     replay_sequenced();
   }
 
@@ -64,7 +69,7 @@ private:
     switch(msg[0])
     {
       case '+':
-        spdlog::info("debug {}", msg.substr(1));
+        spdlog::info("{}: debug {}", _session, msg.substr(1));
         break;
       case 'L':
         _handler->process_login(*this, msg.substr(1));
@@ -78,7 +83,7 @@ private:
         _timeout.expires_after(15s);
         break;
       case 'O':
-        spdlog::info("logout");
+        spdlog::info("{}: logout", _session);
         stop();
         break;
       default:
@@ -89,11 +94,7 @@ private:
 
   void timer_handler() override { dispatch('H'); }
 
-  void replay_sequenced()
-  {
-    load_messages();
-    ++_sequence;
-  }
+  void replay_sequenced() { load_messages(); }
 
   void load_messages()
   {
@@ -101,12 +102,12 @@ private:
     for(const auto& r: rows)
     {
       _sequence = r.sequence;
-      spdlog::info("{}", r.message);
+      spdlog::info("{}: replay ({}) '{}'", _session, _sequence, r.message);
       dispatch('S', r.message);
     }
   }
 
-  std::string _password;
+  std::unique_ptr<Handler> _handler;
   database _database;
 };
 } // namespace fixme::soupstock

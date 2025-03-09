@@ -24,6 +24,10 @@ namespace fixme::soupstock
 class client_handler
 {
 public:
-  void process_sequenced(std::string_view msg) { spdlog::info("{}", msg); }
+  template<typename Session>
+  void process_sequenced(Session& session, std::string_view msg)
+  {
+    spdlog::info("{}: sequenced ({}) {}", session.name(), session.sequence(), msg);
+  }
 };
 } // namespace fixme::soupstock

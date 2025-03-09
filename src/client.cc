@@ -71,20 +71,28 @@ asio::awaitable<int> read_from_stream(asio::posix::stream_descriptor& stream, Se
 
 int main()
 {
-  asio::io_context context;
-  fixme::soupstock::session_config config{"127.0.0.1", "25000", "user", "password", "session"};
-  auto client{std::make_shared<fixme::soupstock::client_session<fixme::soupstock::client_handler>>(context, config)};
-  client->run();
-  client->send_login();
   int result{};
-  asio::posix::stream_descriptor stdin{context, STDIN_FILENO};
-  asio::co_spawn(
-    context,
-    [&] -> asio::awaitable<void> {
-      result = co_await read_from_stream(stdin, *client);
-      co_return;
-    },
-    asio::detached);
-  context.run();
+  try
+  {
+    asio::io_context context;
+    fixme::soupstock::session_config config{"127.0.0.1", "25000", "user", "password", "session"};
+    auto client{std::make_shared<fixme::soupstock::client_session<fixme::soupstock::client_handler>>(context, config)};
+    client->run();
+    client->send_login();
+    asio::posix::stream_descriptor stdin{context, STDIN_FILENO};
+    asio::co_spawn(
+      context,
+      [&] -> asio::awaitable<void> {
+        result = co_await read_from_stream(stdin, *client);
+        co_return;
+      },
+      asio::detached);
+    context.run();
+  }
+  catch(const std::exception& ex)
+  {
+    spdlog::warn("Exception: {}", ex.what());
+    result = 1;
+  }
   return result;
 }

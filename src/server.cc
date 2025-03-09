@@ -69,8 +69,16 @@ private:
 
 int main(int argc, char* argv[])
 {
-  asio::io_context context;
-  fixme::soupstock::server s(context, 25000);
-  context.run();
+  try
+  {
+    asio::io_context context;
+    fixme::soupstock::server s(context, 25000);
+    context.run();
+  }
+  catch(const std::exception& ex)
+  {
+    spdlog::warn("{}", ex.what());
+    return 1;
+  }
   return 0;
 }

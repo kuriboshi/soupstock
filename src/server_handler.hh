@@ -40,11 +40,14 @@ public:
     auto [ptr, ec] = std::from_chars(sequence.data(), sequence.data() + sequence.length(), _sequence);
     if(ec != std::errc{})
     {
-      spdlog::info("reject login: {}", std::make_error_code(ec).message());
-      return session.send_reject_login("A");
+      spdlog::info("reject login {}: {}", std::tuple(_username, _password, _session, _sequence),
+        std::make_error_code(ec).message());
+      return session.reject_login("A");
     }
-    spdlog::info("accept login {}", std::tuple(_username, _password, _session, _sequence));
-    return session.send_accept_login(_session, msg);
+    spdlog::info("{}: accept login {}", _session, std::tuple(_username, _password, _session, _sequence));
+    session.accept_login(_session, fmt::format("{:>10}{:>20}", _session, _sequence));
+    session.replay_sequenced(_sequence);
+    return;
   }
 
   template<typename Session>

@@ -25,6 +25,14 @@ using namespace std::literals;
 
 namespace fixme
 {
+/// @brief Base class for sessions.
+///
+/// There are two virtual function which derived classes need to override.
+/// - `void process_message(std::string_view msg)`
+///   Called for every message received on the socket.
+/// - `void timer_handler()`
+///   Called when the SoupBinTCP heart beat timer expires. The session needs to
+///   send a heart beat message to keep the connection alive.
 class base_session: public std::enable_shared_from_this<base_session>
 {
 public:
@@ -42,7 +50,11 @@ public:
       _timeout(_strand),
       _session(std::move(session))
   {}
+
   virtual ~base_session() = default;
+
+  const std::string& name() const { return _session; }
+  int sequence() const { return _sequence; }
 
   void run()
   {
@@ -53,6 +65,8 @@ public:
   }
 
 protected:
+  /// @brief Reads SoupBinTCP messages from the socket associated with the
+  /// session and process them.
   asio::awaitable<void> reader()
   {
     try
@@ -70,11 +84,15 @@ protected:
     }
     catch(const std::exception& ex)
     {
-      spdlog::info("session '{}' closed: {}", _session, ex.what());
+      spdlog::info("{}: session closed: {}", _session, ex.what());
       stop();
     }
   }
 
+  /// @brief Writes queued messages. Once all messages in the queue are send
+  /// the coroutine exit.
+  ///
+  /// If there are exceptions while writing to the session is stopped.
   asio::awaitable<void> writer()
   {
     try
@@ -92,11 +110,16 @@ protected:
     }
     catch(const std::exception& ex)
     {
-      spdlog::info("exception: {}", ex.what());
+      spdlog::info("{}: exception: {}", _session, ex.what());
       stop();
     }
   }
 
+  /// @brief The heart beat timer coroutine.
+  ///
+  /// Sends a heart beat message every time the timer expires. When other types
+  /// of messages are sent the timer is reset so that heart beat messages are
+  /// only sent if no other messages are sent during the timer period.
   asio::awaitable<void> timer()
   {
     try
@@ -115,11 +138,13 @@ protected:
     }
     catch(const std::exception& ex)
     {
-      spdlog::info("exception: {}", ex.what());
+      spdlog::info("{}: exception: {}", _session, ex.what());
       stop();
     }
   }
 
+  /// @brief Closes the connection if no messages, including heart beat
+  /// messages, are received within a specifed time period.
   asio::awaitable<void> timeout()
   {
     try
@@ -138,20 +163,25 @@ protected:
     }
     catch(const std::exception& ex)
     {
-      spdlog::info("exception: {}", ex.what());
+      spdlog::info("{}: exception: {}", _session, ex.what());
       stop();
     }
   }
 
+  /// @brief Shuts down the connection and stop all activity.
   void stop()
   {
+    _timer.cancel();
+    _timeout.cancel();
     std::error_code ec;
     _socket.shutdown(asio::ip::tcp::socket::shutdown_both, ec);
     _socket.close();
-    _timer.cancel();
-    _timeout.cancel();
   }
 
+  /// @brief Dispatch a message to the message queue.
+  ///
+  /// If this is the first message pushed on the queue the writer coroutine is
+  /// started.
   void dispatch(char message_type, std::string_view data = {})
   {
     asio::post(_strand, [this, message_type, msg = std::string(data)]() {
