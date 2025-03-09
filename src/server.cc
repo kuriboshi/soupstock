@@ -14,13 +14,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "server_handler.hh"
 #include "server_session.hh"
+#include "util.hh"
 
+#include <fmt/ranges.h>
 #include <fmt/std.h>
 #include <spdlog/spdlog.h>
 #include <system_error>
 
-namespace fixme
+namespace fixme::soupstock
 {
 class server
 {
@@ -47,7 +50,7 @@ private:
   {
     spdlog::info(
       "creating session on: {}:{}", socket.remote_endpoint().address().to_string(), socket.remote_endpoint().port());
-    std::make_shared<soup::session>(std::move(socket))->run();
+    std::make_shared<soupstock::server_session<server_handler>>(std::move(socket))->run();
   }
 
   asio::ip::tcp::acceptor _acceptor;
@@ -57,7 +60,7 @@ private:
 int main(int argc, char* argv[])
 {
   asio::io_context io_context;
-  fixme::server s(io_context, 25000);
+  fixme::soupstock::server s(io_context, 25000);
   io_context.run();
   return 0;
 }

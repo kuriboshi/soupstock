@@ -14,16 +14,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "client_handler.hh"
-#include "client_session.hh"
-#include "util.hh"
+#pragma once
 
-int main()
+#include <string_view>
+
+namespace fixme::soupstock
 {
-  asio::io_context context;
-  fixme::soupstock::session_config config{"127.0.0.1", "25000", "user", "password", "session"};
-  auto client{std::make_shared<fixme::soupstock::client_session<fixme::soupstock::client_handler>>(context, config)};
-  asio::co_spawn(context, client->run(), asio::detached);
-  context.run();
-  return 0;
+inline std::string_view trim(std::string_view string)
+{
+  auto begin = string.find_first_not_of(' ');
+  if(begin == std::string_view::npos)
+    return {};
+  auto end = string.find_last_not_of(' ') + 1;
+  return string.substr(begin, end - begin);
+}
 }

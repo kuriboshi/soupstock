@@ -18,6 +18,7 @@
 
 #include "base_session.hh"
 #include "database.hh"
+#include "util.hh"
 
 #include <asio.hpp>
 #include <chrono>
@@ -29,7 +30,7 @@
 
 using namespace std::literals;
 
-namespace fixme::soup
+namespace fixme::soupstock
 {
 struct session_config
 {
@@ -40,11 +41,13 @@ struct session_config
   std::string session;
 };
 
-class client: public base_session
+template <typename Handler>
+class client_session: public base_session
 {
 public:
-  client(asio::io_context& context, const session_config& config)
+  client_session(asio::io_context& context, const session_config& config)
     : base_session(asio::ip::tcp::socket{context}, config.session),
+      _handler(std::make_unique<Handler>()),
       _host(config.host),
       _port(config.port),
       _username(config.username),
@@ -61,6 +64,23 @@ public:
     send_login();
     co_await stdin();
   }
+
+  void send_login()
+  {
+    auto msg = fmt::format("{:<6s}{:<10s}{:<10s}{:<20d}", _username, _password, _session, _sequence);
+    dispatch('L', msg);
+    asio::connect(_socket, _resolver.resolve(_host, _port));
+    auto self = std::static_pointer_cast<client_session>(shared_from_this());
+    asio::co_spawn(_socket.get_executor(), [self] { return self->reader(); }, asio::detached);
+    asio::co_spawn(_socket.get_executor(), [self] { return self->timer(); }, asio::detached);
+    asio::co_spawn(_socket.get_executor(), [self] { return self->timeout(); }, asio::detached);
+  }
+
+  void send_logout() { dispatch('O'); }
+
+  void send_debug(std::string_view data) { dispatch('+', data); }
+
+  void send_unsequenced(std::string_view data) { dispatch('U', data); }
 
 private:
   asio::awaitable<void> stdin()
@@ -118,27 +138,10 @@ private:
     }
   }
 
-  void send_login()
-  {
-    auto msg = fmt::format("{:<6s}{:<10s}{:<10s}{:<20d}", _username, _password, _session, _sequence);
-    dispatch('L', msg);
-    asio::connect(_socket, _resolver.resolve(_host, _port));
-    auto self = std::static_pointer_cast<client>(shared_from_this());
-    asio::co_spawn(_socket.get_executor(), [self] { return self->reader(); }, asio::detached);
-    asio::co_spawn(_socket.get_executor(), [self] { return self->timer(); }, asio::detached);
-    asio::co_spawn(_socket.get_executor(), [self] { return self->timeout(); }, asio::detached);
-  }
-
-  void send_logout() { dispatch('O'); }
-
-  void send_debug(std::string_view data) { dispatch('+', data); }
-
-  void send_unsequenced(std::string_view data) { dispatch('U', data); }
-
   void process_sequenced(std::string_view msg)
   {
-    spdlog::info("{}", msg);
     _database.store_input(msg);
+    _handler->process_sequenced(msg);
   }
 
   void process_message(std::string_view msg) override
@@ -173,6 +176,7 @@ private:
 
   void timer_handler() override { dispatch('R'); }
 
+  std::unique_ptr<Handler> _handler;
   std::string _host;
   std::string _port;
   std::string _username;
@@ -181,4 +185,4 @@ private:
   asio::ip::tcp::resolver _resolver;
   database _database;
 };
-} // namespace fixme::soup
+} // namespace fixme::soupstock

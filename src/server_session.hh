@@ -20,7 +20,6 @@
 #include "database.hh"
 
 #include <asio.hpp>
-#include <charconv>
 #include <chrono>
 #include <fmt/chrono.h>
 #include <fmt/ranges.h>
@@ -28,16 +27,19 @@
 
 using namespace std::literals;
 
-namespace fixme::soup
+namespace fixme::soupstock
 {
-class session: public base_session
+template <typename Handler>
+class server_session: public base_session
 {
+  std::unique_ptr<Handler> _handler;
+
 public:
-  session(asio::ip::tcp::socket socket)
-    : base_session(std::move(socket))
+  server_session(asio::ip::tcp::socket socket)
+    : base_session(std::move(socket)),
+      _handler(std::make_unique<Handler>())
   {}
 
-private:
   void send_sequenced(std::string_view msg)
   {
     _database.store_output(msg);
@@ -45,24 +47,19 @@ private:
     dispatch('S', msg);
   }
 
-  void process_login(const std::string_view msg)
+  void send_reject_login(std::string_view reason)
   {
-    std::string sequence;
-    std::tie(_username, _password, _session, sequence) =
-      std::tuple(trim(msg.substr(0, 6)), trim(msg.substr(6, 10)), trim(msg.substr(16, 10)), trim(msg.substr(26, 20)));
-    auto [ptr, ec] = std::from_chars(sequence.data(), sequence.data() + sequence.length(), _sequence);
-    if(ec != std::errc{})
-    {
-      spdlog::info("process_login: {}", std::make_error_code(ec).message());
-      dispatch('J', "A");
-      return;
-    }
-    spdlog::info("process_login {}", std::tuple(_username, _password, _session, _sequence));
+    dispatch('J', reason);
+  }
+
+  void send_accept_login(std::string_view session, std::string_view msg)
+  {
     dispatch('A', msg);
-    _database.open(fmt::format("server-{}-{}.db", _username, _session));
+    _database.open(fmt::format("server-{}.db", session));
     replay_sequenced();
   }
 
+private:
   void process_message(std::string_view msg) override
   {
     if(msg.empty())
@@ -73,12 +70,12 @@ private:
         spdlog::info("debug {}", msg.substr(1));
         break;
       case 'L':
-        process_login(msg.substr(1));
+        _handler->process_login(*this, msg.substr(1));
         break;
       case 'S':
         break;
       case 'U':
-        process_unsequenced(msg.substr(1));
+        _handler->process_unsequenced(*this, msg.substr(1));
         break;
       case 'R':
         _timeout.expires_after(15s);
@@ -91,13 +88,6 @@ private:
         spdlog::info("unknown packet type: {}", msg[0]);
         break;
     }
-  }
-
-  void process_unsequenced(const std::string_view msg)
-  {
-    if(msg == "date")
-      send_sequenced(fmt::format("{:%Y-%m-%d %H:%M:%S}",
-        std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now())));
   }
 
   void timer_handler() override { dispatch('H'); }
@@ -119,7 +109,6 @@ private:
     }
   }
 
-  std::string _username;
   std::string _password;
   database _database;
 };

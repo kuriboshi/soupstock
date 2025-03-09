@@ -163,15 +163,6 @@ protected:
     });
   }
 
-  std::string_view trim(std::string_view string)
-  {
-    auto begin = string.find_first_not_of(' ');
-    if(begin == std::string_view::npos)
-      return {};
-    auto end = string.find_last_not_of(' ') + 1;
-    return string.substr(begin, end - begin);
-  }
-
   asio::ip::tcp::socket _socket;
   asio::strand<asio::any_io_executor> _strand;
   asio::steady_timer _timer;
