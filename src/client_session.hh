@@ -41,7 +41,7 @@ struct session_config
   std::string session;
 };
 
-template <typename Handler>
+template<typename Handler>
 class client_session: public base_session
 {
 public:
@@ -52,28 +52,27 @@ public:
       _port(config.port),
       _username(config.username),
       _password(config.password),
-      _stdin(context, STDIN_FILENO),
       _resolver(context)
   {}
 
-  asio::awaitable<void> run()
+  void run()
   {
-    _database.open(fmt::format("client-{}-{}.db", _username, _session));
-    load_messages();
-    ++_sequence;
-    send_login();
-    co_await stdin();
-  }
-
-  void send_login()
-  {
-    auto msg = fmt::format("{:<6s}{:<10s}{:<10s}{:<20d}", _username, _password, _session, _sequence);
-    dispatch('L', msg);
-    asio::connect(_socket, _resolver.resolve(_host, _port));
     auto self = std::static_pointer_cast<client_session>(shared_from_this());
     asio::co_spawn(_socket.get_executor(), [self] { return self->reader(); }, asio::detached);
     asio::co_spawn(_socket.get_executor(), [self] { return self->timer(); }, asio::detached);
     asio::co_spawn(_socket.get_executor(), [self] { return self->timeout(); }, asio::detached);
+  }
+
+  void close() { stop(); }
+
+  void send_login()
+  {
+    _database.open(fmt::format("client-{}-{}.db", _username, _session));
+    load_messages();
+    ++_sequence;
+    auto msg = fmt::format("{:<6s}{:<10s}{:<10s}{:<20d}", _username, _password, _session, _sequence);
+    dispatch('L', msg);
+    asio::connect(_socket, _resolver.resolve(_host, _port));
   }
 
   void send_logout() { dispatch('O'); }
@@ -83,51 +82,6 @@ public:
   void send_unsequenced(std::string_view data) { dispatch('U', data); }
 
 private:
-  asio::awaitable<void> stdin()
-  {
-    static std::regex re_quit{"q(uit)?"};
-    static std::regex re_logout{"lo(gout)?"};
-    static std::regex re_debug{"debug (.*)"};
-    static std::regex re_date{"date"};
-    try
-    {
-      while(true)
-      {
-        std::string data;
-        co_await asio::async_read_until(_stdin, asio::dynamic_buffer(data), '\n', asio::use_awaitable);
-        if(data.length() >= 1)
-        {
-          data.pop_back();
-          std::smatch m;
-          if(std::regex_match(data, m, re_quit))
-            break;
-          if(std::regex_match(data, m, re_logout))
-          {
-            send_logout();
-            break;
-          }
-          if(std::regex_match(data, m, re_debug))
-          {
-            send_debug(m[1].str());
-            continue;
-          }
-          if(std::regex_match(data, m, re_date))
-          {
-            send_unsequenced(data);
-            continue;
-          }
-          spdlog::info("unknown command");
-          // send_unsequenced(data);
-        }
-      }
-    }
-    catch(const std::exception& ex)
-    {
-      spdlog::info("exception: {}", ex.what());
-      stop();
-    }
-  }
-
   void load_messages()
   {
     auto rows = _database.load_input();
@@ -181,7 +135,6 @@ private:
   std::string _port;
   std::string _username;
   std::string _password;
-  asio::posix::stream_descriptor _stdin;
   asio::ip::tcp::resolver _resolver;
   database _database;
 };

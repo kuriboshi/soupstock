@@ -18,12 +18,73 @@
 #include "client_session.hh"
 #include "util.hh"
 
+namespace
+{
+template<typename Session>
+asio::awaitable<int> read_from_stream(asio::posix::stream_descriptor& stream, Session& session)
+{
+  static std::regex re_quit{"q(uit)?"};
+  static std::regex re_logout{"lo(gout)?"};
+  static std::regex re_debug{"debug (.*)"};
+  static std::regex re_date{"date"};
+  try
+  {
+    while(true)
+    {
+      std::string data;
+      co_await asio::async_read_until(stream, asio::dynamic_buffer(data), '\n', asio::use_awaitable);
+      if(data.length() >= 1)
+      {
+        data.pop_back();
+        std::smatch m;
+        if(std::regex_match(data, m, re_quit))
+          break;
+        if(std::regex_match(data, m, re_logout))
+        {
+          session.send_logout();
+          break;
+        }
+        if(std::regex_match(data, m, re_debug))
+        {
+          session.send_debug(m[1].str());
+          continue;
+        }
+        if(std::regex_match(data, m, re_date))
+        {
+          session.send_unsequenced(data);
+          continue;
+        }
+        spdlog::info("unknown command");
+        // send_unsequenced(data);
+      }
+    }
+  }
+  catch(const std::exception& ex)
+  {
+    spdlog::info("exception: {}", ex.what());
+    session.close();
+    co_return 1;
+  }
+  co_return 0;
+}
+} // namespace
+
 int main()
 {
   asio::io_context context;
   fixme::soupstock::session_config config{"127.0.0.1", "25000", "user", "password", "session"};
   auto client{std::make_shared<fixme::soupstock::client_session<fixme::soupstock::client_handler>>(context, config)};
-  asio::co_spawn(context, client->run(), asio::detached);
+  client->run();
+  client->send_login();
+  int result{};
+  asio::posix::stream_descriptor stdin{context, STDIN_FILENO};
+  asio::co_spawn(
+    context,
+    [&] -> asio::awaitable<void> {
+      result = co_await read_from_stream(stdin, *client);
+      co_return;
+    },
+    asio::detached);
   context.run();
-  return 0;
+  return result;
 }
