@@ -75,7 +75,7 @@ int main()
   try
   {
     asio::io_context context;
-    fixme::soupstock::session_config config{"127.0.0.1", "25000", "user", "password", "session"};
+    fixme::soupstock::session_config config{"127.0.0.1", "25000", "user1", "password1", "session1"};
     auto client{std::make_shared<fixme::soupstock::client_session<fixme::soupstock::client_handler>>(context, config)};
     client->run();
     client->send_login();

@@ -22,9 +22,51 @@
 #include <fmt/std.h>
 #include <spdlog/spdlog.h>
 #include <system_error>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace fixme::soupstock
 {
+class authenticator
+{
+public:
+  struct string_view_hash
+  {
+    using is_transparent = void;
+    std::size_t operator()(std::string_view sv) const { return std::hash<std::string_view>{}(sv); }
+  };
+
+  struct string_view_equal
+  {
+    using is_transparent = void;
+    bool operator()(std::string_view lhs, std::string_view rhs) const { return lhs == rhs; }
+  };
+
+  bool authenticate(std::string_view username, std::string_view password, std::string_view sessionName)
+  {
+    if(auto session{_user_sessions.find(username)};
+      session != _user_sessions.end() && session->second.contains(sessionName))
+    {
+      auto user{_users.find(username)};
+      return user != _users.end() && user->second == password;
+    }
+    return false;
+  }
+
+  void add_user(std::string_view user, std::string_view password) { _users.try_emplace(std::string(user), password); }
+  void add_session(std::string_view user, std::string_view session)
+  {
+    auto place = _user_sessions.try_emplace(std::string(user)).first;
+    place->second.emplace(session);
+  }
+
+private:
+  std::unordered_map<std::string, std::string, string_view_hash, string_view_equal> _users;
+  std::unordered_map<std::string, std::unordered_set<std::string, string_view_hash, string_view_equal>,
+    string_view_hash, string_view_equal>
+    _user_sessions;
+};
+
 /// @brief Accepts TCP connections, creating server sessions for each connection.
 class server
 {
@@ -33,8 +75,9 @@ public:
   ///
   /// @param context The asio::io_context object. Need to create the acceptor.
   /// @param port The port on which the server accepts connections.
-  server(asio::io_context& context, short port)
-    : _acceptor(context, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port))
+  server(std::shared_ptr<authenticator> authenticator, asio::io_context& context, short port)
+    : _acceptor(context, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port)),
+      _authenticator(std::move(authenticator))
   {
     accept();
   }
@@ -59,11 +102,13 @@ private:
   {
     spdlog::info(
       "creating session on: {}:{}", socket.remote_endpoint().address().to_string(), socket.remote_endpoint().port());
-    std::make_shared<soupstock::server_session<server_handler>>(std::move(socket))->run();
+    std::make_shared<soupstock::server_session<server_handler, authenticator>>(std::move(socket), _authenticator)
+      ->run();
   }
 
   /// @brief The acceptor.
   asio::ip::tcp::acceptor _acceptor;
+  std::shared_ptr<authenticator> _authenticator;
 };
 } // namespace fixme::soupstock
 
@@ -72,7 +117,10 @@ int main(int argc, char* argv[])
   try
   {
     asio::io_context context;
-    fixme::soupstock::server s(context, 25000);
+    auto authenticator{std::make_shared<fixme::soupstock::authenticator>()};
+    authenticator->add_user("user1", "password1");
+    authenticator->add_session("user1", "session1");
+    fixme::soupstock::server s(std::move(authenticator), context, 25000);
     context.run();
   }
   catch(const std::exception& ex)

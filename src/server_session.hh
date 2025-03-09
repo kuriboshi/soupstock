@@ -29,13 +29,13 @@ using namespace std::literals;
 
 namespace fixme::soupstock
 {
-template<typename Handler>
+template<template<typename> class Handler, typename Authenticator>
 class server_session: public base_session
 {
 public:
-  server_session(asio::ip::tcp::socket socket)
+  server_session(asio::ip::tcp::socket socket, std::shared_ptr<Authenticator> authenticator)
     : base_session(std::move(socket)),
-      _handler(std::make_unique<Handler>())
+      _handler(std::make_unique<Handler<Authenticator>>(std::move(authenticator)))
   {}
 
   void send_sequenced(std::string_view msg)
@@ -107,7 +107,7 @@ private:
     }
   }
 
-  std::unique_ptr<Handler> _handler;
+  std::unique_ptr<Handler<Authenticator>> _handler;
   database _database;
 };
 } // namespace fixme::soupstock

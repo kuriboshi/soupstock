@@ -28,25 +28,39 @@
 
 namespace fixme::soupstock
 {
+template<typename Authenticator>
 class server_handler
 {
+  std::shared_ptr<Authenticator> _authenticator;
+
 public:
+  server_handler(std::shared_ptr<Authenticator> authenticator)
+    : _authenticator(std::move(authenticator))
+  {}
+
   template<typename Session>
   void process_login(Session& session, const std::string_view msg)
   {
-    std::string sequence;
-    std::tie(_username, _password, _session, sequence) =
+    auto [username, password, sessionName, sequenceNumber] =
       std::tuple(trim(msg.substr(0, 6)), trim(msg.substr(6, 10)), trim(msg.substr(16, 10)), trim(msg.substr(26, 20)));
-    auto [ptr, ec] = std::from_chars(sequence.data(), sequence.data() + sequence.length(), _sequence);
+    int sequence;
+    auto [ptr, ec] = std::from_chars(sequenceNumber.data(), sequenceNumber.data() + sequenceNumber.length(), sequence);
     if(ec != std::errc{})
     {
-      spdlog::info("reject login {}: {}", std::tuple(_username, _password, _session, _sequence),
+      spdlog::info("reject login {}: {}", std::tuple(username, password, sessionName, sequenceNumber),
         std::make_error_code(ec).message());
       return session.reject_login("A");
     }
-    spdlog::info("{}: accept login {}", _session, std::tuple(_username, _password, _session, _sequence));
-    session.accept_login(_session, fmt::format("{:>10}{:>20}", _session, _sequence));
-    session.replay_sequenced(_sequence);
+    if(!_authenticator->authenticate(username, password, sessionName))
+    {
+      spdlog::info("reject login {}: {}", std::tuple(username, password, sessionName, sequenceNumber),
+        std::make_error_code(ec).message());
+      return session.reject_login("A");
+    }
+    _session = sessionName;
+    spdlog::info("{}: accept login {}", _session, std::tuple(username, password, sessionName, sequenceNumber));
+    session.accept_login(_session, fmt::format("{:>10}{:>20}", sessionName, sequence));
+    session.replay_sequenced(sequence);
     return;
   }
 
@@ -59,9 +73,6 @@ public:
   }
 
 private:
-  std::string _username;
-  std::string _password;
   std::string _session;
-  int _sequence;
 };
 } // namespace fixme::soupstock
