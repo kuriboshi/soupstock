@@ -29,7 +29,7 @@ using namespace std::literals;
 
 namespace fixme::soupstock
 {
-template <typename Handler>
+template<typename Handler>
 class server_session: public base_session
 {
   std::unique_ptr<Handler> _handler;
@@ -47,10 +47,7 @@ public:
     dispatch('S', msg);
   }
 
-  void send_reject_login(std::string_view reason)
-  {
-    dispatch('J', reason);
-  }
+  void send_reject_login(std::string_view reason) { dispatch('J', reason); }
 
   void send_accept_login(std::string_view session, std::string_view msg)
   {
@@ -112,4 +109,4 @@ private:
   std::string _password;
   database _database;
 };
-} // namespace fixme::soup
+} // namespace fixme::soupstock

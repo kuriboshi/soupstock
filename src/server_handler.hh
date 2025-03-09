@@ -31,7 +31,8 @@ namespace fixme::soupstock
 class server_handler
 {
 public:
-  template <typename Session> void process_login(Session& session, const std::string_view msg)
+  template<typename Session>
+  void process_login(Session& session, const std::string_view msg)
   {
     std::string sequence;
     std::tie(_username, _password, _session, sequence) =
@@ -46,7 +47,8 @@ public:
     return session.send_accept_login(_session, msg);
   }
 
-  template <typename Session> void process_unsequenced(Session& session, const std::string_view msg)
+  template<typename Session>
+  void process_unsequenced(Session& session, const std::string_view msg)
   {
     if(msg == "date")
       session.send_sequenced(fmt::format("{:%Y-%m-%d %H:%M:%S}",
@@ -59,4 +61,4 @@ private:
   std::string _session;
   int _sequence;
 };
-}
+} // namespace fixme::soupstock

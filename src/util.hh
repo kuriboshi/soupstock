@@ -28,4 +28,4 @@ inline std::string_view trim(std::string_view string)
   auto end = string.find_last_not_of(' ') + 1;
   return string.substr(begin, end - begin);
 }
-}
+} // namespace fixme::soupstock

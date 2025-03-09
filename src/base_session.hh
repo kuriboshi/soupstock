@@ -34,6 +34,7 @@ public:
       _timer(_strand),
       _timeout(_strand)
   {}
+
   base_session(asio::ip::tcp::socket socket, std::string session)
     : _socket(std::move(socket)),
       _strand(asio::make_strand(_socket.get_executor())),

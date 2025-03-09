@@ -25,16 +25,22 @@
 
 namespace fixme::soupstock
 {
+/// @brief Accepts TCP connections, creating server sessions for each connection.
 class server
 {
 public:
-  server(asio::io_context& io_context, short port)
-    : _acceptor(io_context, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port))
+  /// @brief Start accepting connections on a specific port.
+  ///
+  /// @param context The asio::io_context object. Need to create the acceptor.
+  /// @param port The port on which the server accepts connections.
+  server(asio::io_context& context, short port)
+    : _acceptor(context, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port))
   {
     accept();
   }
 
 private:
+  /// @brief Creates a server session when a new connection is accepted.
   void accept()
   {
     _acceptor.async_accept([this](std::error_code ec, asio::ip::tcp::socket socket) {
@@ -46,6 +52,9 @@ private:
     });
   }
 
+  /// @brief Create a server session using the specifed socket.
+  ///
+  /// @param socket The socket used for bidirectional communication with the client.
   void create_session(asio::ip::tcp::socket socket)
   {
     spdlog::info(
@@ -53,14 +62,15 @@ private:
     std::make_shared<soupstock::server_session<server_handler>>(std::move(socket))->run();
   }
 
+  /// @brief The acceptor.
   asio::ip::tcp::acceptor _acceptor;
 };
-} // namespace fixme
+} // namespace fixme::soupstock
 
 int main(int argc, char* argv[])
 {
-  asio::io_context io_context;
-  fixme::soupstock::server s(io_context, 25000);
-  io_context.run();
+  asio::io_context context;
+  fixme::soupstock::server s(context, 25000);
+  context.run();
   return 0;
 }

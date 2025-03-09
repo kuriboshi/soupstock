@@ -24,9 +24,6 @@ namespace fixme::soupstock
 class client_handler
 {
 public:
-  void process_sequenced(std::string_view msg)
-  {
-    spdlog::info("{}", msg);
-  }
+  void process_sequenced(std::string_view msg) { spdlog::info("{}", msg); }
 };
-}
+} // namespace fixme::soupstock
